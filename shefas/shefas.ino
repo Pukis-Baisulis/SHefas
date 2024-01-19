@@ -9,8 +9,8 @@
 #define SDA1_PIN 14
 #define I2C_1_CLOCK 400000 //400khz
 
-#define MOSI_PIN // SD(spi)
-#define MISO_PIN
+#define RX_PIN 12// SD(spi)
+#define TX_PIN 11
 #define CS_PIN 13
 #define CLK_PIN 10
 
@@ -32,9 +32,13 @@
 //may include modified versions of the libraries, copy both from project folder to the libraries folder 
 #include <Servo.h>
 #include <Wire.h> 
+#include <SPI.h>
+#include <SD.h>
 #include "SparkFun_VL53L5CX_Library.h"
 #include "MPU6050_light.h"
 #include "MPU6050A.h"
+
+File logFile;
 
 SparkFun_VL53L5CX vlx[3];
 VL53L5CX_ResultsData vlxData[3];
@@ -77,9 +81,28 @@ int speed = 0;
 void drive(int spd, int dir);
 void sensors();
 void PID();
+void enterMenu();
 
 void setup() {
-  Serial.begin(115200);
+  // SPI config
+    SPI1.setRX(12);
+    SPI1.setCS(13);
+    SPI1.setSCK(10);
+    SPI1.setTX(11);
+  // debug and datalog to file with next number
+    Serial.begin(115200);
+    SD.begin(CS_PIN, SPI1); 
+    int i = 1000;
+    while(true){
+      String fileName = String(i);
+      fileName = fileName + ".txt";
+      if(!SD.exists(fileName){
+        logFile = SD.open(fileName);
+        break;
+      }
+      i++;
+    }
+    
   //pinModes
     servo.attach(SERVO_PIN);// servo attachment 
     pinMode(PWM_PIN,     OUTPUT); // pinModes
@@ -128,7 +151,7 @@ void setup() {
 
     vlx[1].setResolution(8 * 8);//set resolution 
     vlx[1].setRangingFrequency(15); //set refresh rate
-    vlx[1].setSharpenerPercent(20);
+    //vlx[1].setSharpenerPercent(20);
     vlx[1].setRangingMode(SF_VL53L5CX_RANGING_MODE::CONTINUOUS);
     vlx[1].startRanging();//start ranging
     
@@ -230,24 +253,25 @@ void sensors(){
     //side sensor modifiers and create modified side sensor distances
       int alfa = map(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED, -57, 57);
   //*print data
+
     for(int i = 0; i < 4; i++){
-      Serial.print(distA[i]);
-      Serial.print(" ");
+      logFile.print(distA[i]);
+      logFile.print(" ");
     }
     for(int i = 0; i < 4; i++){
-      Serial.print(distB[i]);
-      Serial.print(" ");
+      logFile.print(distB[i]);
+      logFile.print(" ");
     }
     for(int i = 0; i < 4; i++){
-      Serial.print(sideMod[i]);
-      Serial.print(" ");
+      logFile.print(sideMod[i]);
+      logFile.print(" ");
     }
-    Serial.print(" ");
-    Serial.print(targetPos);
-    Serial.print(" (");
-    Serial.print(targetDist);
-    Serial.print(") ");
-    Serial.println();//*/
+    logFile.print(" ");
+    logFile.print(targetPos);
+    logFile.print(" (");
+    logFile.print(targetDist);
+    logFile.print(") ");
+    logFile.println();//*/
   
 }
 
