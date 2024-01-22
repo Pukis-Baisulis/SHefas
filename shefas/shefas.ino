@@ -5,14 +5,14 @@
 #define SDA0_PIN 20
 #define I2C_0_CLOCK 1000000 //1Mhz
 
-#define SCL1_PIN 15 // for mpu-6050
-#define SDA1_PIN 14
+#define SCL1_PIN 11 // for mpu-6050
+#define SDA1_PIN 10
 #define I2C_1_CLOCK 400000 //400khz
 
-#define MOSI_PIN // SD(spi)
-#define MISO_PIN
+#define SRX_PIN 12 // SD(spi)
+#define STX_PIN 15
 #define CS_PIN 13
-#define CLK_PIN 10
+#define CLK_PIN 14
 
 #define IR_PIN 1
 
@@ -32,9 +32,13 @@
 //may include modified versions of the libraries, copy both from project folder to the libraries folder 
 #include <Servo.h>
 #include <Wire.h> 
+#include <SPI.h>
+#include <SD.h>
 #include "SparkFun_VL53L5CX_Library.h"
 #include "MPU6050_light.h"
 #include "MPU6050A.h"
+
+File logFile;
 
 SparkFun_VL53L5CX vlx[3];
 VL53L5CX_ResultsData vlxData[3];
@@ -45,6 +49,7 @@ MPU6050 mpuB(Wire1);
 MPU6050A mpuA(Wire1); 
 
 Servo servo;
+
 #define SERVO_MIN 0// to be determined expermentaly !!!
 #define SERVO_MAX 180
 #define SERVO_MIDPOINT 93
@@ -77,9 +82,19 @@ int speed = 0;
 void drive(int spd, int dir);
 void sensors();
 void PID();
+void enterMenu();
 
 void setup() {
-  Serial.begin(115200);
+  // SPI config
+    SPI1.setRX(SRX_PIN);
+    SPI1.setCS(CS_PIN);
+    SPI1.setSCK(CLK_PIN);
+    SPI1.setTX(STX_PIN);
+  // debug and datalog to file with next number
+    Serial.begin(115200);
+    SD.begin(CS_PIN, SPI1);
+    logFile = SD.open("logs.txt");
+    logFile.println("N New log");
   //pinModes
     servo.attach(SERVO_PIN);// servo attachment 
     pinMode(PWM_PIN,     OUTPUT); // pinModes
@@ -128,7 +143,7 @@ void setup() {
 
     vlx[1].setResolution(8 * 8);//set resolution 
     vlx[1].setRangingFrequency(15); //set refresh rate
-    vlx[1].setSharpenerPercent(20);
+    //vlx[1].setSharpenerPercent(20);
     vlx[1].setRangingMode(SF_VL53L5CX_RANGING_MODE::CONTINUOUS);
     vlx[1].startRanging();//start ranging
     
@@ -145,6 +160,10 @@ void setup() {
     mpuA.begin();
     mpuB.begin(); 
 
+
+  //end
+    digitalWrite(LED_PIN, HIGH);
+
 }
 
 void loop() {
@@ -159,8 +178,8 @@ void sensors(){
   //Left VLX
     if (vlx[0].isDataReady() == true) 
     {
-      vlx[0].getRangingData(&vlxData[0]);vlxData[1].
-      
+      vlx[0].getRangingData(&vlxData[0]);
+      //vlxData[1].
       for(int i = 0; i < 4; i++){//use 4 vertical arrays  ||||
         int sum = vlxData[0].distance_mm[i*4+1] + vlxData[0].distance_mm[i*4+2];
         if(abs((sum/2)-vlxData[0].distance_mm[i*4])<ALLOWED_DELTA_SIDES){
@@ -211,7 +230,6 @@ void sensors(){
     {
       vlx[2].getRangingData(&vlxData[2]);
       //vlx[2].
-      
       for(int i = 0; i < 4; i++){//use 4 vertical arrays  ||||
         int sum = vlxData[2].distance_mm[i*4+1] + vlxData[2].distance_mm[i*4+2];
         if(abs((sum/2)-vlxData[2].distance_mm[i*4])<ALLOWED_DELTA_SIDES){
@@ -230,24 +248,25 @@ void sensors(){
     //side sensor modifiers and create modified side sensor distances
       int alfa = map(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED, -57, 57);
   //*print data
+
     for(int i = 0; i < 4; i++){
-      Serial.print(distA[i]);
-      Serial.print(" ");
+      logFile.print(distA[i]);
+      logFile.print(" ");
     }
     for(int i = 0; i < 4; i++){
-      Serial.print(distB[i]);
-      Serial.print(" ");
+      logFile.print(distB[i]);
+      logFile.print(" ");
     }
     for(int i = 0; i < 4; i++){
-      Serial.print(sideMod[i]);
-      Serial.print(" ");
+      logFile.print(sideMod[i]);
+      logFile.print(" ");
     }
-    Serial.print(" ");
-    Serial.print(targetPos);
-    Serial.print(" (");
-    Serial.print(targetDist);
-    Serial.print(") ");
-    Serial.println();//*/
+    logFile.print(" ");
+    logFile.print(targetPos);
+    logFile.print(" (");
+    logFile.print(targetDist);
+    logFile.print(") ");
+    logFile.println();//*/
   
 }
 
