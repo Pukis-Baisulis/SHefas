@@ -106,7 +106,7 @@
   double kD = 2; // later divided by 1000
 
 #define APPVALUES_COUNT 3
-long int AppValues[APPVALUES_COUNT] = {0, 0, 0};
+double AppValues[APPVALUES_COUNT] = {kP, kI, kD};
 char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
 
 // prototypes
@@ -234,17 +234,17 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
         }
       }
     //IR
-      if (IrReceiver.decode()) {
-        IrReceiver.printIRResultShort(&Serial);
-        IrReceiver.printIRSendUsage(&Serial);
-        Serial.println();
+      // if (IrReceiver.decode()) {
+      //   IrReceiver.printIRResultShort(&Serial);
+      //   IrReceiver.printIRSendUsage(&Serial);
+      //   Serial.println();
 
-        IrReceiver.resume();
+      //   IrReceiver.resume();
 
-        switch(IrReceiver.decodedIRData.command == 0x10{
+      //   switch(IrReceiver.decodedIRData.command == 0x10{
 
-        }
-      }
+      //   }
+      // }
   }
 
 //addon functions
@@ -258,7 +258,7 @@ int PID(){
     err += err/targetPos;
   }
   I += err;
-  double pid = constrain(((err*kP) + (I*kI) - (((err-lastErr)/(micros()-lastT))*kD)),-45,45);
+  double pid = constrain(((err*kP) + (I*kI) + (((err-lastErr)/(micros()-lastT))*kD)),-45,45);
   lastT = micros();
   lastErr = err;
   if(goStraight){
