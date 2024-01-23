@@ -1,6 +1,6 @@
 #include "IRremote.h"
 
-#define IR_RECEIVE_PIN 2
+#define IR_RECEIVE_PIN 1
 
 void setup() {
   Serial.begin(9600);
@@ -13,7 +13,7 @@ void loop() {
     IrReceiver.resume();
     delay(10);
     if(IrReceiver.decode()){
-      code = (IrReceiver.decodedIRData.command);
+      code = (IrReceiver.decodedIRData.command == NEC);
       break;
     }
   } 

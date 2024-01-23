@@ -3,8 +3,8 @@
 // Formatas -> /string
 // Pvz. -> /P200 -> nustato P reiksme i 200
 
-//SoftwareSerial SerialBT(5, 4);
-SoftwareSerial SerialBT(0, 1); // nano
+SoftwareSerial SerialBT(5, 4);
+//SoftwareSerial SerialBT(0, 1); // nano
 
 char bt_byte;
 String bt_text;

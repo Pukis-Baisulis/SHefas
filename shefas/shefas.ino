@@ -34,6 +34,7 @@
   //plz just copy the libraries from the project folder and not use downloaded ones(exeptions: Wire.h, Servo.h)!
   //may include modified versions of the libraries, copy both from project folder to the libraries folder 
   #include <Servo.h>
+  #include <IRremote.hpp>
   #include <Wire.h> 
   #include <SPI.h>
   #include <SD.h>
@@ -74,6 +75,8 @@
   #define MIN_SPEED 80
 
 // variables
+  bool setupDone = false;
+  bool go=true;
   int targetPos = 0; 
   int targetDist = 0; 
   int avgDistFront = 0;
@@ -192,7 +195,14 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
     //setup end credits
       digitalWrite(LED_PIN, HIGH);
       servo.write(SERVO_MIDPOINT);
-      logFile.flush();
+      setupDone=true;
+  }
+
+  void setup1(){
+    IrReceiver.begin(1, ENABLE_LED_FEEDBACK);
+
+
+    while(!setupDone){}
   }
 
   void loop() {
@@ -202,6 +212,39 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
     Serial.print(steer);
     Serial.println();//*/
     drive(speed, steer);
+  }
+
+  void loop1(){
+    // bluetooth
+      String result=GetString();
+      String value="";
+      if(result!="") SerialBT.println(result);
+
+      for(int i=2; i<result[0]; i++){
+        value+=result[i];
+      }
+
+      for(int i=0; i<APPVALUES_COUNT; i++){
+        if(result[1]==AppIndexes[i]){
+          AppValues[i]=value.toInt();
+          SerialBT.print("*");
+        }
+        if(result!=""){
+          SerialBT.print(AppIndexes[i]); SerialBT.print(" "); SerialBT.println(AppValues[i]);
+        }
+      }
+    //IR
+      if (IrReceiver.decode()) {
+        IrReceiver.printIRResultShort(&Serial);
+        IrReceiver.printIRSendUsage(&Serial);
+        Serial.println();
+
+        IrReceiver.resume();
+
+        switch(IrReceiver.decodedIRData.command == 0x10{
+
+        }
+      }
   }
 
 //addon functions
@@ -317,47 +360,6 @@ void sensors(){
       speed = constrain(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
     //side sensor modifiers and create modified side sensor distances
       //int alfa = map(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED, -57, 57);
-
-  // bluetooth
-    String result=GetString();
-    String value="";
-    if(result!="") SerialBT.println(result);
-
-    for(int i=2; i<result[0]; i++){
-      value+=result[i];
-    }
-
-    for(int i=0; i<APPVALUES_COUNT; i++){
-      if(result[1]==AppIndexes[i]){
-        AppValues[i]=value.toInt();
-        SerialBT.print("*");
-      }
-      if(result!=""){
-        SerialBT.print(AppIndexes[i]); SerialBT.print(" "); SerialBT.println(AppValues[i]);
-      }
-    }
-  //*print data
-
-    for(int i = 0; i < 4; i++){
-      Serial.print(distA[i]);
-      Serial.print(" ");
-    }
-    for(int i = 0; i < 4; i++){
-      Serial.print(distB[i]);
-      Serial.print(" ");
-    }
-    for(int i = 0; i < 4; i++){
-      Serial.print(sideMod[i]);
-      Serial.print(" ");
-    }
-    Serial.print(" ");
-    Serial.print(targetPos);
-    Serial.print(" (");
-    Serial.print(targetDist);
-    Serial.print(") ");
-    
-
-
 
 
 }
