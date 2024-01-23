@@ -57,6 +57,7 @@
   #define SERVO_MAX 160
   #define SERVO_MIDPOINT 80
 
+  #define MAX_VLX_DIST_SIDES 500
   #define MAX_VLX_DIST_FRONT 2000 // front sensor distance limit, impacts speed and acceleration 
   #define MIN_FRONT_DIST 500 // starts ignoring obstacles beyond this distance
   #define USE_SPADS_FRONT 48 //disregard some of the top distances (2 layers)
@@ -76,7 +77,12 @@
   int avgDistFront = 0;
   bool targetIgnore = false;
   int distA[4]={0,0,0,0};
+  bool maxTagA[4]={false,false,false,false};
+  int tagsA = 0;
   int distB[4]={0,0,0,0};
+  bool maxTagB[4]={false,false,false,false};
+  int tagsB = 0;
+  bool goStraight = false;
   int sideMod[4]={10,25,40,25};//if everything works correctly should add up to 100
   int distModA[4]={0,0,0,0};
   int distModB[4]={0,0,0,0};
@@ -90,7 +96,7 @@
   long long I = 0;
   long long lastT=0;
 
-  double kP = 0.03;
+  double kP = 0.07;
   double kI = 0;
   double kD = 0.005; // later divided by 1000
 
@@ -111,7 +117,7 @@
       logFile = SD.open("logs.txt", FILE_WRITE);
       logFile.println("N New log");
     //pinModes
-      servo.attach(SERVO_PIN, 900, 2100);// servo attachment 
+      servo.attach(SERVO_PIN, 900, 2300);// servo attachment 
       pinMode(PWM_PIN,     OUTPUT); // pinModes
       pinMode(IN_A_PIN,    OUTPUT);
       pinMode(IN_B_PIN,    OUTPUT);
@@ -198,11 +204,19 @@ int PID(){
   long dB = ((distB[0]*sideMod[3])+(distB[1]*sideMod[2])+(distB[2]*sideMod[1])+(distB[3]*sideMod[0]))/100;
   long pos = dB - dA;
   long err = target - pos;
+  if(!targetIgnore){
+    err += err/targetPos;
+  }
   I += err;
-  double pid = constrain(((err*kP) + (I*kI) + (((err-lastErr)/(micros()-lastT))*kD)),-45,45);
+  double pid = constrain(((err*kP) + (I*kI) - (((err-lastErr)/(micros()-lastT))*kD)),-45,45);
   lastT = micros();
   lastErr = err;
-  return pid;
+  if(goStraight){
+    I=0;
+    return 0;
+  }
+  else 
+    return pid;
 }
 
 void sensors(){
@@ -210,6 +224,7 @@ void sensors(){
   //Left VLX
     if (vlx[0].isDataReady() == true) 
     {
+      tagsA=0;
       vlx[0].getRangingData(&vlxData[0]);
       //vlxData[1].
       for(int i = 0; i < 4; i++){//use 4 vertical arrays  ||||
@@ -220,6 +235,11 @@ void sensors(){
         }
         else{
           distA[i] = sum/2;
+        }
+        maxTagA[i]=false;
+        if(distA[i] >= MAX_VLX_DIST_SIDES){
+          maxTagA[i] = true;
+          tagsA++;
         }
       }
     }
@@ -260,6 +280,7 @@ void sensors(){
   //Right VLX
     if (vlx[2].isDataReady() == true)
     {
+      tagsB = 0;
       vlx[2].getRangingData(&vlxData[2]);
       //vlx[2].
       for(int i = 0; i < 4; i++){//use 4 vertical arrays  ||||
@@ -271,9 +292,19 @@ void sensors(){
         else{
           distB[i] = sum/2;
         }
+        maxTagB[i]=false;
+        if(distB[i] >= MAX_VLX_DIST_SIDES){
+          maxTagB[i] = true;
+          tagsB++;
+        }
       }
     }
   //calculations
+    //mode
+      goStraight = false;
+      if(tagsA >=2 && tagsB >=2){
+        goStraight = true;
+      }
     //speed
       speed = map((avgDistFront+targetDist)/2, MIN_SPEED_DISTANCE, MAX_VLX_DIST_FRONT, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
       speed = constrain(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
