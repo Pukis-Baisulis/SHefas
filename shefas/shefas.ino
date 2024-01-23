@@ -37,6 +37,8 @@
   #include <Wire.h> 
   #include <SPI.h>
   #include <SD.h>
+  #include <SoftwareSerial.h>
+  #include "bt.h"
   #include "SparkFun_VL53L5CX_Library.h"
   #include "MPU6050_light.h"
   #include "MPU6050A.h"
@@ -83,7 +85,7 @@
   bool maxTagB[4]={false,false,false,false};
   int tagsB = 0;
   bool goStraight = false;
-  int sideMod[4]={10,25,40,25};//if everything works correctly should add up to 100
+  int sideMod[4]={35,40,25,0};//if everything works correctly should add up to 100
   int distModA[4]={0,0,0,0};
   int distModB[4]={0,0,0,0};
 
@@ -96,9 +98,13 @@
   long long I = 0;
   long long lastT=0;
 
-  double kP = 0.07;
+  double kP = 0.3;
   double kI = 0;
-  double kD = 0.005; // later divided by 1000
+  double kD = 2; // later divided by 1000
+
+#define APPVALUES_COUNT 3
+long int AppValues[APPVALUES_COUNT] = {0, 0, 0};
+char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
 
 // prototypes
   void drive(int spd, int dir);
@@ -113,6 +119,7 @@
       SPI1.setTX(STX_PIN);
     // debug and datalog to file with next number
       Serial.begin(115200);
+      SerialBT.begin(115200);
       SD.begin(CS_PIN, SPI1);
       logFile = SD.open("logs.txt", FILE_WRITE);
       logFile.println("N New log");
@@ -302,14 +309,33 @@ void sensors(){
   //calculations
     //mode
       goStraight = false;
-      if(tagsA >=2 && tagsB >=2){
+      if(tagsA >=3 && tagsB >=3){
         goStraight = true;
       }
     //speed
       speed = map((avgDistFront+targetDist)/2, MIN_SPEED_DISTANCE, MAX_VLX_DIST_FRONT, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
       speed = constrain(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
     //side sensor modifiers and create modified side sensor distances
-      int alfa = map(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED, -57, 57);
+      //int alfa = map(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED, -57, 57);
+
+  // bluetooth
+    String result=GetString();
+    String value="";
+    if(result!="") SerialBT.println(result);
+
+    for(int i=2; i<result[0]; i++){
+      value+=result[i];
+    }
+
+    for(int i=0; i<APPVALUES_COUNT; i++){
+      if(result[1]==AppIndexes[i]){
+        AppValues[i]=value.toInt();
+        SerialBT.print("*");
+      }
+      if(result!=""){
+        SerialBT.print(AppIndexes[i]); SerialBT.print(" "); SerialBT.println(AppValues[i]);
+      }
+    }
   //*print data
 
     for(int i = 0; i < 4; i++){
