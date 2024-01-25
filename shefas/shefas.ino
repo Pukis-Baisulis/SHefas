@@ -76,7 +76,7 @@
 
 // variables
   bool setupDone = false;
-  bool go=true;
+  bool go=false;
   int targetPos = 0; 
   int targetDist = 0; 
   int avgDistFront = 0;
@@ -92,15 +92,15 @@
   int distModA[4]={0,0,0,0};
   int distModB[4]={0,0,0,0};
 
-  bool drvEn = true;
-  int speed = 0;
-
   
   int target = 0;
   int lastErr = 0;
   long long I = 0;
   long long lastT=0;
 
+
+  bool drvEn = true;
+  int speed = 0;
   double kP = 0.3;
   double kI = 0;
   double kD = 2; // later divided by 1000
@@ -172,9 +172,8 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
       vlx[0].startRanging();//start ranging
       
 
-      vlx[1].setResolution(8 * 8);//set resolution 
-      vlx[1].setRangingFrequency(15); //set refresh rate
-      //vlx[1].setSharpenerPercent(20);
+      vlx[1].setResolution(4 * 4);//set resolution 
+      vlx[1].setRangingFrequency(60); //set refresh rate
       vlx[1].setRangingMode(SF_VL53L5CX_RANGING_MODE::CONTINUOUS);
       vlx[1].startRanging();//start ranging
       
@@ -196,6 +195,7 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
       digitalWrite(LED_PIN, HIGH);
       servo.write(SERVO_MIDPOINT);
       setupDone=true;
+      while(!motEn && !go){}
   }
 
   void setup1(){
@@ -203,14 +203,12 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
 
 
     while(!setupDone){}
+    go=true;
   }
 
   void loop() {
     sensors();
     int steer = PID();
-    Serial.print(" ");
-    Serial.print(steer);
-    Serial.println();//*/
     drive(speed, steer);
   }
 
@@ -254,9 +252,6 @@ int PID(){
   long dB = ((distB[0]*sideMod[3])+(distB[1]*sideMod[2])+(distB[2]*sideMod[1])+(distB[3]*sideMod[0]))/100;
   long pos = dB - dA;
   long err = target - pos;
-  if(!targetIgnore){
-    err += err/targetPos;
-  }
   I += err;
   double pid = constrain(((err*kP) + (I*kI) + (((err-lastErr)/(micros()-lastT))*kD)),-45,45);
   lastT = micros();
@@ -293,7 +288,7 @@ void sensors(){
         }
       }
     }
-  //Front VLX
+  /*/Front VLX
     if (vlx[1].isDataReady() == true) 
     {
       vlx[1].getRangingData(&vlxData[1]);
@@ -326,7 +321,7 @@ void sensors(){
         targetPos = 0;
         targetIgnore = true;
       }
-    }
+    }//*/
   //Right VLX
     if (vlx[2].isDataReady() == true)
     {
@@ -355,11 +350,6 @@ void sensors(){
       if(tagsA >=3 && tagsB >=3){
         goStraight = true;
       }
-    //speed
-      speed = map((avgDistFront+targetDist)/2, MIN_SPEED_DISTANCE, MAX_VLX_DIST_FRONT, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
-      speed = constrain(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED);
-    //side sensor modifiers and create modified side sensor distances
-      //int alfa = map(speed, MIN_NORMAL_SPEED, MAX_NORMAL_SPEED, -57, 57);
 
 
 }
