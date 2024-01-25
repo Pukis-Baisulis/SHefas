@@ -34,7 +34,7 @@
   //plz just copy the libraries from the project folder and not use downloaded ones(exeptions: Wire.h, Servo.h)!
   //may include modified versions of the libraries, copy both from project folder to the libraries folder 
   #include <Servo.h>
-  #include <IRremote.hpp>
+ // #include <IRremote.hpp>
   #include <Wire.h> 
   #include <SPI.h>
   #include <SD.h>
@@ -105,9 +105,9 @@
   double kI = 0;
   double kD = 2; // later divided by 1000
 
-#define APPVALUES_COUNT 3
-double AppValues[APPVALUES_COUNT] = {kP, kI, kD};
-char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
+#define APPVALUES_COUNT 4
+double AppValues[APPVALUES_COUNT] = {kP, kI, kD, speed};
+char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
 
 // prototypes
   void drive(int spd, int dir);
@@ -122,7 +122,7 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
       SPI1.setTX(STX_PIN);
     // debug and datalog to file with next number
       Serial.begin(115200);
-      SerialBT.begin(115200);
+      SerialBT.begin(9600);
       SD.begin(CS_PIN, SPI1);
       logFile = SD.open("logs.txt", FILE_WRITE);
       logFile.println("N New log");
@@ -195,11 +195,11 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
       digitalWrite(LED_PIN, HIGH);
       servo.write(SERVO_MIDPOINT);
       setupDone=true;
-      while(!motEn && !go){}
+      while(!drvEn && !go){}
   }
 
   void setup1(){
-    IrReceiver.begin(1, ENABLE_LED_FEEDBACK);
+    //IrReceiver.begin(1, ENABLE_LED_FEEDBACK);
 
 
     while(!setupDone){}
@@ -216,7 +216,7 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
     // bluetooth
       String result=GetString();
       String value="";
-      if(result!="") SerialBT.println(result);
+      //if(result!="") Serial.println(result);
 
       for(int i=2; i<result[0]; i++){
         value+=result[i];
@@ -224,13 +224,18 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D'};
 
       for(int i=0; i<APPVALUES_COUNT; i++){
         if(result[1]==AppIndexes[i]){
-          AppValues[i]=value.toInt();
-          SerialBT.print("*");
+          if(result[2]=='+') AppValues[i]+=value.toDouble();
+          else if(result[2]=='-') AppValues[i]-=value.toDouble();
+          else AppValues[i]=value.toDouble();
+          break;
         }
         if(result!=""){
           SerialBT.print(AppIndexes[i]); SerialBT.print(" "); SerialBT.println(AppValues[i]);
         }
+        Serial.print(AppIndexes[i]); Serial.print(" "); Serial.print(AppValues[i]); Serial.print(" ");
       }
+      Serial.println("");
+
     //IR
       // if (IrReceiver.decode()) {
       //   IrReceiver.printIRResultShort(&Serial);
