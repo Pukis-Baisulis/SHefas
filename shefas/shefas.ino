@@ -58,7 +58,7 @@
 
   #define SERVO_MIN 0// to be determined expermentaly !!!
   #define SERVO_MAX 160
-  #define SERVO_MIDPOINT 80
+  int ServoMidpoint=76;
 
   #define MAX_VLX_DIST_SIDES 500
   #define MAX_VLX_DIST_FRONT 2000 // front sensor distance limit, impacts speed and acceleration 
@@ -99,15 +99,16 @@
   long long lastT=0;
 
 
-  bool drvEn = true;
-  int speed = 0;
+  bool drvEn = false;
+  int speed = 100;
   double kP = 0.3;
   double kI = 0;
   double kD = 2; // later divided by 1000
+  bool magic = false;
 
-#define APPVALUES_COUNT 4
-double AppValues[APPVALUES_COUNT] = {kP, kI, kD, speed};
-char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
+#define APPVALUES_COUNT 6
+double AppValues[APPVALUES_COUNT] = {kP, kI, kD, speed, go, ServoMidpoint};
+char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S', 'G', 'M'};
 
 // prototypes
   void drive(int spd, int dir);
@@ -123,11 +124,12 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
     // debug and datalog to file with next number
       Serial.begin(115200);
       SerialBT.begin(9600);
-      SD.begin(CS_PIN, SPI1);
-      logFile = SD.open("logs.txt", FILE_WRITE);
-      logFile.println("N New log");
+      //SD.begin(CS_PIN, SPI1);
+      //logFile = SD.open("logs.txt", FILE_WRITE);
+      //logFile.println("N New log");
+
     //pinModes
-      servo.attach(SERVO_PIN, 900, 2300);// servo attachment 
+      servo.attach(SERVO_PIN);// servo attachment 
       pinMode(PWM_PIN,     OUTPUT); // pinModes
       pinMode(IN_A_PIN,    OUTPUT);
       pinMode(IN_B_PIN,    OUTPUT);
@@ -136,7 +138,7 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
       pinMode(XSHUT_C_PIN, OUTPUT);
       pinMode(LED_PIN,     OUTPUT);
 
-      servo.write(SERVO_MIDPOINT); // set all output pins LOW 
+      servo.write(ServoMidpoint); // set all output pins LOW 
       digitalWrite(PWM_PIN,     LOW);
       digitalWrite(IN_A_PIN,    LOW);
       digitalWrite(IN_B_PIN,    LOW);
@@ -170,7 +172,7 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
       vlx[0].setRangingFrequency(60); //set refresh rate
       vlx[0].setRangingMode(SF_VL53L5CX_RANGING_MODE::CONTINUOUS);
       vlx[0].startRanging();//start ranging
-      
+      SerialBT.println("a");
 
       vlx[1].setResolution(4 * 4);//set resolution 
       vlx[1].setRangingFrequency(60); //set refresh rate
@@ -193,9 +195,11 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
 
     //setup end credits
       digitalWrite(LED_PIN, HIGH);
-      servo.write(SERVO_MIDPOINT);
       setupDone=true;
-      while(!drvEn && !go){}
+      while(!drvEn && !go)
+      { 
+        servo.write(ServoMidpoint);
+      }
   }
 
   void setup1(){
@@ -203,7 +207,7 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
 
 
     while(!setupDone){}
-    go=true;
+    drvEn=false;
   }
 
   void loop() {
@@ -224,17 +228,31 @@ char AppIndexes[APPVALUES_COUNT] = {'P', 'I', 'D', 'S'};
 
       for(int i=0; i<APPVALUES_COUNT; i++){
         if(result[1]==AppIndexes[i]){
-          if(result[2]=='+') AppValues[i]+=value.toDouble();
-          else if(result[2]=='-') AppValues[i]-=value.toDouble();
+          if(result[2]=='+' || result[2]=='-') AppValues[i]+=value.toDouble();
           else AppValues[i]=value.toDouble();
           break;
-        }
-        if(result!=""){
-          SerialBT.print(AppIndexes[i]); SerialBT.print(" "); SerialBT.println(AppValues[i]);
         }
         Serial.print(AppIndexes[i]); Serial.print(" "); Serial.print(AppValues[i]); Serial.print(" ");
       }
       Serial.println("");
+
+      if(result!=""){
+        for(int i=0; i<30; i++){
+          SerialBT.println();
+        }
+        for(int i=0; i<APPVALUES_COUNT; i++){
+          if(result!=""){
+            SerialBT.print(AppIndexes[i]); SerialBT.print("   "); SerialBT.println(AppValues[i]);
+          }
+        }
+      }
+
+      kP=AppValues[0];
+      kI=AppValues[1];
+      kD=AppValues[2];
+      speed=AppValues[3];
+      go=AppValues[4];
+      ServoMidpoint=AppValues[5];
 
     //IR
       // if (IrReceiver.decode()) {
@@ -258,7 +276,7 @@ int PID(){
   long pos = dB - dA;
   long err = target - pos;
   I += err;
-  double pid = constrain(((err*kP) + (I*kI) + (((err-lastErr)/(micros()-lastT))*kD)),-45,45);
+  double pid = constrain(((err*kP) + (I*kI) + (((err-lastErr)/(micros()-lastT))*kD)),-60,60);
   lastT = micros();
   lastErr = err;
   if(goStraight){
@@ -276,21 +294,8 @@ void sensors(){
     {
       tagsA=0;
       vlx[0].getRangingData(&vlxData[0]);
-      //vlxData[1].
       for(int i = 0; i < 4; i++){//use 4 vertical arrays  ||||
-        int sum = vlxData[0].distance_mm[i+8] + vlxData[0].distance_mm[i+4];
-        if(abs((sum/2)-vlxData[0].distance_mm[i])<ALLOWED_DELTA_SIDES){
-          sum += vlxData[0].distance_mm[i];
-          distA[i] = sum/3;
-        }
-        else{
-          distA[i] = sum/2;
-        }
-        maxTagA[i]=false;
-        if(distA[i] >= MAX_VLX_DIST_SIDES){
-          maxTagA[i] = true;
-          tagsA++;
-        }
+        distA[i]=vlxData[0].distance_mm[i];
       }
     }
   /*/Front VLX
@@ -332,21 +337,8 @@ void sensors(){
     {
       tagsB = 0;
       vlx[2].getRangingData(&vlxData[2]);
-      //vlx[2].
       for(int i = 0; i < 4; i++){//use 4 vertical arrays  ||||
-        int sum = vlxData[2].distance_mm[i+8] + vlxData[2].distance_mm[i+4];
-        if(abs((sum/2)-vlxData[2].distance_mm[i])<ALLOWED_DELTA_SIDES){
-          sum += vlxData[2].distance_mm[i];
-          distB[i] = sum/3;
-        }
-        else{
-          distB[i] = sum/2;
-        }
-        maxTagB[i]=false;
-        if(distB[i] >= MAX_VLX_DIST_SIDES){
-          maxTagB[i] = true;
-          tagsB++;
-        }
+        distB[i]=vlxData[2].distance_mm[i];
       }
     }
   //calculations
@@ -360,10 +352,10 @@ void sensors(){
 }
 
 void drive(int spd, int dir){  
-  int dirN = map(dir, -45, 45, SERVO_MIN, SERVO_MAX);
+  int dirN = ServoMidpoint+dir;
   dirN = constrain(dirN, SERVO_MIN, SERVO_MAX);
   servo.write(dirN);
-  if(drvEn){
+  if(go){
     analogWrite(PWM_PIN, abs(spd));
     if(spd > 0){
       digitalWrite(IN_A_PIN, HIGH);
